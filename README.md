@@ -1,2 +1,4 @@
-# Cue-Sports-League-Manager
-League Management tool for the UoM Cue Sports society. 
+# Cue Sports League Manager
+League Management tool for the University of Manchester Cue Sports society. 
+
+Original code written by Ashley Smith and Jonathan Mulvey.
