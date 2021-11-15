@@ -9,10 +9,14 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.IO;
 
+
+
 namespace _8_Ball_League
 {
+    
     public partial class Form1 : Form
     {
+        bool DEBUG = true;
         List<string> playernames = new List<string>();
         List<float> playerrankings = new List<float>();
         Form2 form2 = new Form2();
@@ -85,7 +89,17 @@ namespace _8_Ball_League
 
         private void Form1_Load(object sender, EventArgs e)
         {
-                       
+            if (DEBUG)
+            {
+                // If debugging, autoload a ranking file and check the first 8 players
+                filepathbox.Text = "D:\\Documents\\git\\cuesports\\data\\local\\rank\\rankings_test.txt"; 
+                updatelist();
+                for (int i = 0; i < 8; i++)
+                {
+                    playerlist.SetItemChecked(i, true);
+                }
+            }
+            
             /*string path = Directory.GetCurrentDirectory();
             path += "\\Resources";
             //if(!Directory.Exists(path))
@@ -93,7 +107,7 @@ namespace _8_Ball_League
 
             resourcepath = file;*/
 
-            
+
         }
 
         private void Addplayerbutton_Click(object sender, EventArgs e)

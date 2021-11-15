@@ -15,25 +15,24 @@ namespace _8_Ball_League
     {
         int maxlabsiz = 0;
 
-        bool applicationisclosing = false;
-
         List<string> playernames;
         List<float> playerrankings;
 
         List<string> fullplayernames;
         List<float> fullplayerrankings;
 
-        List<float> playerscore;
+        List<float> playerwins;
 
         Random rnd = new Random();
 
         List<roundinfo> rounds = new List<roundinfo>();
-
         List<playerinfo> players = new List<playerinfo>();
 
         public Form1 form1;
 
+        bool allowearlyrematches = false;   // Whether to allow rematches before necessary
         List<bool> isplaying = new List<bool>();
+        List<int> byes = new List<int>();
 
         private struct playerinfo
         {
@@ -51,6 +50,8 @@ namespace _8_Ball_League
             public int p2index;
             public float p1score;
             public float p2score;
+            public bool finished;
+
             public List<Control> controls;
             public TextBox p1txt;
             public TextBox p2txt;
@@ -83,16 +84,17 @@ namespace _8_Ball_League
             for(int i = 0; i < playernames.Count; i++)
             {
                 isplaying.Add(true);
+                byes.Add(0);   
             }
 
             fullplayernames = fpn;
             fullplayerrankings = fpr;
 
-            playerscore = new List<float>();
+            playerwins = new List<float>();
 
             for (int i = 0; i < playernames.Count; i++)
             {
-                playerscore.Add(0);
+                playerwins.Add(0);
 
                 playerinfo pi = new playerinfo();
 
@@ -105,7 +107,7 @@ namespace _8_Ball_League
             updateUI(0);
         }
 
-        private void initmatchup()
+        private void initmatchup() // Creates a set of random matches for round 1
         {
             roundinfo initround = new roundinfo();
             initround.matches = new List<matchinfo>();
@@ -121,10 +123,10 @@ namespace _8_Ball_League
                 plind.Add(i);
             }
 
-            if (plind.Count % 2 != 0)
+            if (plind.Count % 2 != 0) // If the number of playing players are odd
             {
                 match = new matchinfo();
-                next = rnd.Next(0, plind.Count);
+                next = rnd.Next(0, plind.Count); // Random player chosen to take the bye
                 match.p1index = plind[next];
                 match.p2index = -1; //-1 = bye
                 plind.RemoveAt(next);
@@ -283,19 +285,20 @@ namespace _8_Ball_League
             }
 
         private void updatematchscore()
-        {
+         /* Recreate the match data whenever any of the text boxes are updated */
 
-            for (int i = 0; i < playerscore.Count; i++)
+        {
+            for (int i = 0; i < playerwins.Count; i++)
             {
-                playerscore[i] = 0;
+                playerwins[i] = 0;
             }
 
             for (int i = 0; i < rounds.Count; i++)
             {
-
                 for (int j = 0; j < rounds[i].matches.Count; j++)
                 {
                     matchinfo currentmatch = rounds[i].matches[j];
+                    currentmatch.finished = false;
 
                     if (!float.TryParse(currentmatch.p1txt.Text, out currentmatch.p1score))
                     {
@@ -307,15 +310,19 @@ namespace _8_Ball_League
                         currentmatch.p2score = 0;
                     }
 
-                    if (currentmatch.p1score < currentmatch.p2score)
+                    if (currentmatch.p1score < currentmatch.p2score) // Player 2 win
                     {
-                        playerscore[currentmatch.p2index] += 1;
+                        playerwins[currentmatch.p2index] += 1;
+                        currentmatch.finished = true;
                     }
 
-                    else if (currentmatch.p1score > currentmatch.p2score)
+                    else if (currentmatch.p1score > currentmatch.p2score) // Player 1 win
                     {
-                        playerscore[currentmatch.p1index] += 1;
+                        playerwins[currentmatch.p1index] += 1;
+                        currentmatch.finished = true;
                     }
+
+                    // Increment the amount opponent played for both players 
 
                     playerinfo pi = players[currentmatch.p1index];
                     pi.amountplayed[currentmatch.p2index]++;
@@ -325,6 +332,8 @@ namespace _8_Ball_League
                     pi.amountplayed[currentmatch.p1index]++;
                     players[currentmatch.p2index] = pi;
 
+                    // Add the match to the full match record
+
                     rounds[i].matches[j] = currentmatch;
                 }
 
@@ -332,8 +341,13 @@ namespace _8_Ball_League
 
         }
 
-        private List<int> orderlist(List<float> lst)
+        private List<int> orderlist(List<float> lst) 
         {
+            /* Produces an ordered list of currently playing players by wins, with players on the same win level randomly ordered.
+             * 
+             * List<float> lst: List of wins of each player with index corresponding to number to player id. 
+             */
+
             List<float> score = new List<float>();
             List<int> index = new List<int>();
 
@@ -356,7 +370,7 @@ namespace _8_Ball_League
             int next = 0;
             int cnt = temp.Count;
 
-            for (int i = 0; i < cnt; i++)
+            for (int i = 0; i < cnt; i++) // Randomly orders the playing players, producing a corresponding list of players and scores
             {
                 next = rnd.Next(0, temp.Count);
                 score.Add(temp[next]);
@@ -431,11 +445,121 @@ namespace _8_Ball_League
 
             return temp;
         }
+        private Dictionary<int, double> getWLPercentages(List<int> players) {
+            Dictionary<int, double> playerpercents = new Dictionary<int, double>();
+            
 
-        private void createnewround2()
+            Dictionary<int, int[]> playermatchdata = new Dictionary<int, int[]>(); // playerindex: [games, wins]
+            foreach (int player in players)
+            {
+                playermatchdata[player] = new int[] {0, 0};
+            }
+            
+            // Get number of games and wins for each player
+
+            foreach (roundinfo round in rounds)
+            {
+                foreach(matchinfo match in round.matches)               // Iterate over each match in each round
+                {
+                    if (!match.finished)
+                    {
+                        continue;                                       // Match not finished; ignore it 
+                    }
+                    if (playermatchdata.ContainsKey(match.p1index)) {   // If player 1 is playing this round 
+                        playermatchdata[match.p1index][0] += 1;         // Increment games by 1 for player 1
+                        if (match.p1score > 0)                          // If player 1 wins
+                        {
+                            playermatchdata[match.p1index][1] += 1;     // Increment wins by 1
+                        }
+                    }
+
+                    if (playermatchdata.ContainsKey(match.p2index))     // If player 2 is playing this round 
+                    {   
+                        playermatchdata[match.p2index][0] += 1;         // Increment games by 1 for player 2
+                        if (match.p2score > 0)                          // If player 2 wins
+                        {
+                            playermatchdata[match.p2index][1] += 1;     // Increment wins by 2
+                        }
+                    }
+                }
+            }
+
+            foreach(int playerindex in playermatchdata.Keys)
+            {
+                //Console.WriteLine(playermatchdata[playerindex][0].ToString() + ' ' + playermatchdata[playerindex][1].ToString());
+                if (playermatchdata[playerindex][0] == 0)   // No games played, make percentage 0.5
+                {
+                    playerpercents[playerindex] = 0.5;
+                }
+                else
+                {
+                    playerpercents[playerindex] = (double)playermatchdata[playerindex][1] / (double)playermatchdata[playerindex][0];
+                }
+            }
+           
+            return playerpercents;
+        }
+
+        private List<int> getPlayingList()
+        /* Returns a list containing the indexes of all currently ticked players */
+        
         {
+            List<int> players = new List<int>();
+            for (int pindx=0; pindx < playerwins.Count; pindx++)
+            {
+                if (isplaying[pindx])
+                {
+                    players.Add(pindx);
+                }
+            }
+            
+            return players;
 
-            List<int> orderedplayers = orderlist(playerscore);
+        }
+
+        private int[,] generateMatchupMatrix(List<int> players)
+        {
+            int[,] matrix = new int[players.Count, players.Count];
+            Dictionary<int, double> playerpercents = getWLPercentages(players);
+            int minbyes = byes.Min();
+
+
+            for (int i = 0; i< players.Count; i++)
+            {
+                for (int j = 0; j < players.Count; j++)
+                {
+                    if (i == j)
+                    {
+                        if (players.Count % 2 == 0)
+                        {
+                            matrix[i, j] = -1; // Even number of players, so bye not allowed 
+                        } 
+                        else
+                        {
+                            if (byes[players[i]] == minbyes) // Player is eligible for a bye
+                            {
+                                matrix[i, j] = 1000; // Bye allowed for player (high number prevents multiple byes being assigned in a single round)
+                            }
+                            else
+                            {
+                                matrix[i, j] = -1; // Player has already taken a bye in this cycle; not allowed
+                            }
+                            
+                        }
+                    }
+                }
+            }
+        }
+        private void generateRound()
+        {
+            List<int> players = getPlayingList();
+            
+        }
+        private void createnewround()
+        {
+            generateRound();
+            List<int> orderedplayers = orderlist(playerwins); // Produces ranked list of players by wins with players on the same wins randomly ranked
+            
 
             bool done = false;
             int mastercounter = 0;
@@ -513,90 +637,6 @@ namespace _8_Ball_League
             rounds.Add(initround);
         }
 
-        private void createnewround()
-        {
-            List<int> orderedplayers = orderlist(playerscore);
-            bool done = false;
-            List<int> groupedscores = new List<int>();
-            roundinfo initround = new roundinfo();
-            initround.matches = new List<matchinfo>();
-            bool spareplayer = false;
-            int mastercounter = 0;
-
-            while (!done)
-            {
-                mastercounter++;
-
-                if (mastercounter > 1000)
-                {
-                    done = true;
-                    string message = "while loop unexpected exit";
-                    string caption = "";
-                    MessageBox.Show(message, caption, MessageBoxButtons.OK);
-                }
-
-                float currentscore = playerscore[orderedplayers[0]];
-                groupedscores.Add(orderedplayers[0]);
-                orderedplayers.RemoveAt(0);
-
-                int count = orderedplayers.Count;
-                int index = 0;
-
-                for (int i = 0; i < count; i++)
-                {
-
-                    if (currentscore == playerscore[orderedplayers[index]])
-                    {
-                        groupedscores.Add(orderedplayers[index]);
-                        orderedplayers.RemoveAt(index);
-                    }
-                    else index++;
-
-                }
-
-                int next = 0;
-                matchinfo match = new matchinfo();
-                int nummatch = 0;
-
-                if (groupedscores.Count % 2 != 0)
-                {
-                    nummatch = (groupedscores.Count - 1) / 2;
-                    spareplayer = true;
-                }
-                else
-                {
-                    nummatch = groupedscores.Count / 2;
-                    spareplayer = false;
-                }
-
-                for (int i = 0; i < nummatch; i++)
-                {
-                    match = new matchinfo();
-                    next = rnd.Next(0, groupedscores.Count);
-                    match.p1index = groupedscores[next];
-                    groupedscores.RemoveAt(next);
-                    next = rnd.Next(0, groupedscores.Count);
-                    match.p2index = groupedscores[next];
-                    groupedscores.RemoveAt(next);
-                    initround.matches.Add(match);
-                }
-
-                if (orderedplayers.Count == 0)
-                {
-                    if (groupedscores.Count == 1)
-                    {
-                        match = new matchinfo();
-                        match.p1index = groupedscores[0];
-                        match.p2index = -1; //-1 = bye
-                        initround.matches.Add(match);
-                    }
-                    done = true;
-                }
-
-            }
-
-            rounds.Add(initround);
-        }
 
         public Form2()
         {
@@ -612,7 +652,7 @@ namespace _8_Ball_League
         {
             updateplayerlist();
             updatematchscore();
-            createnewround2();
+            createnewround();
             updateUI(rounds.Count - 1);
         }
 
@@ -647,7 +687,7 @@ namespace _8_Ball_League
                     playernames.Add(selectedplayers[i]);
                     playerrankings.Add(selectedrankings[i]);
                     isplaying.Add(true);
-                    playerscore.Add(0);
+                    playerwins.Add(0);
 
                     playerinfo pi = new playerinfo();
 
@@ -712,9 +752,9 @@ namespace _8_Ball_League
         private void updaterankings()
         {
 
-            for (int i = 0; i < playerscore.Count; i++)
+            for (int i = 0; i < playerwins.Count; i++)
             {
-                playerscore[i] = 0;
+                playerwins[i] = 0;
             }
 
             for (int i = 0; i < rounds.Count; i++)
