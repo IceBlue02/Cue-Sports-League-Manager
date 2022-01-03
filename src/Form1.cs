@@ -183,12 +183,6 @@ namespace _8_Ball_League
                     selrank.Add(playerrankings[playerlist.CheckedIndices[i]]);
                 }
 
-                if (selplay.Count % 2 != 0)
-                {
-                    selplay.Add("Bye");
-                    selrank.Add(0);
-                }
-
                 form2.init(selplay, selrank, playernames, playerrankings);
 
 
@@ -267,11 +261,13 @@ namespace _8_Ball_League
                     //selrank.Add(playerrankings[playerlist.CheckedIndices[i]]);
                 }
 
+                /*
                 if (selplay.Count % 2 != 0)
                 {
                     selplay.Add("Bye");
                     //selrank.Add(0);
                 }
+                */
 
             return selplay;
 
@@ -291,11 +287,7 @@ namespace _8_Ball_League
                 selrank.Add(playerrankings[playerlist.CheckedIndices[i]]);
             }
 
-            if (selrank.Count % 2 != 0)
-            {
-                //selplay.Add("Bye");
-                selrank.Add(0);
-            }
+           
 
             return selrank;
 
